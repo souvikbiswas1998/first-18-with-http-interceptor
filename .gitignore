@@ -43,3 +43,4 @@ Thumbs.db
 package-lock.json
 src/index.html
 index.html
+**/index.html
