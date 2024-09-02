@@ -4,11 +4,13 @@ import { Component, DestroyRef, Inject, OnDestroy, inject } from '@angular/core'
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs/internal/Subscription';
+import { AgmComponent } from "./agm/agm.component";
+import { CommonService } from './common.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NgIf],
+  imports: [RouterOutlet, NgIf, AgmComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -18,8 +20,7 @@ export class AppComponent implements OnDestroy {
   subs: Subscription[] = [];
   destryRef = inject(DestroyRef)
 
-  constructor(private http: HttpClient) {
-    let subs: any;
+  constructor(private http: HttpClient, private cs: CommonService) {
     this.subs.push(http.post('http://localhost:3000/login', {
       "email": "safaryaara@gmail.com",
       "password": "Subham@202",
@@ -34,17 +35,19 @@ export class AppComponent implements OnDestroy {
       console.log(user);
       localStorage.setItem('accessToken', user.token.accessToken)
       localStorage.setItem('refreshToken', user.token.refreshToken)
-      setInterval(() => {
-        http.post('http://localhost:3000/refresh', {
-          email: "safaryaara@gmail.com",
-          refreshToken: localStorage.getItem('refreshToken'),
-          accessToken: localStorage.getItem('accessToken')
-        }).pipe(takeUntilDestroyed(this.destryRef)).subscribe((response: any) => {
-          console.log(response.accessToken);
-          // Store the new access token in local storage
-          localStorage.setItem('accessToken', response.accessToken);
-        });
-      }, 2000);
+      setTimeout(() => {
+        // cs.updateToken().then(d => {
+        //   console.log(d);
+
+        // }).catch(e => {
+        //   console.log(e);
+
+        // })
+        http.get('http://localhost:3000/admin/payment/get-all-status')
+          .pipe(takeUntilDestroyed(this.destryRef)).subscribe((response: any) => {
+            console.log(response);
+          });
+      }, 6000);
     }))
   }
   ngOnDestroy(): void {

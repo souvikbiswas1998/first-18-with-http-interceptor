@@ -1,152 +1,72 @@
-import { Injectable } from '@angular/core';
+import { inject } from '@angular/core';
 import {
-  HttpInterceptor,
   HttpRequest,
   HttpErrorResponse,
-  HttpHandler,
   HttpEvent,
-  HttpResponse,
   HttpInterceptorFn,
   HttpHandlerFn,
 } from '@angular/common/http';
-import { finalize, Observable, retry } from 'rxjs';
-import { Router } from '@angular/router';
-import { tap } from 'rxjs/internal/operators/tap';
-// import { ApiService } from './service/api.service';
-
-// @Injectable()
-// export class MyHttpInterceptor implements HttpInterceptor {
-//   constructor(private router: Router) // private service: ApiService
-//   { }
-
-//   intercept(
-//     request: HttpRequest<unknown>,
-//     next: HttpHandler
-//   ): Observable<HttpEvent<unknown>> {
-//     // this.service.loader.next(true);
-//     let access_token = localStorage.getItem('accessToken');
-//     console.log(access_token);
-//     request = request.clone({
-//       setHeaders: {
-//         Authorization: `Bearer ${access_token}`,
-//         // "Access-Control-Expose-Headers": "*",
-//         // "Access-Control-Allow-Headers": "*"
-//       },
-//     });
-//     return next.handle(request).pipe(
-//       // finalize(() => this.service.loader.next(false)),
-//       tap({
-//         next: (httpEvent) => {
-//           // console.log(httpEvent);
-//           if (httpEvent instanceof HttpResponse) {
-//             // console.log(httpEvent.headers.keys())
-//             // console.log(httpEvent.headers.getAll('host-header'), 'host header');
-//             // console.log(httpEvent.headers.has('token'), 'token');
-//             // console.log(httpEvent.headers.keys(),'responses');
-//           }
-//         },
-//         error: (err: any) => {
-//           // console.log(err,'intercept');
-
-//           if (err instanceof HttpErrorResponse) {
-//             switch (err.status) {
-//               case 401:
-//                 localStorage.setItem(
-//                   'temp_url',
-//                   localStorage.getItem('url') || '/'
-//                 );
-//                 localStorage.removeItem('token');
-//                 this.router.navigate(['/login']);
-//                 break;
-//               case 402:
-//                 localStorage.setItem(
-//                   'temp_url',
-//                   localStorage.getItem('url') || '/'
-//                 );
-//                 localStorage.removeItem('token');
-//                 this.router.navigate(['/login']);
-//                 break;
-//               case 403:
-//                 localStorage.setItem(
-//                   'temp_url',
-//                   localStorage.getItem('url') || '/'
-//                 );
-//                 localStorage.removeItem('token');
-//                 this.router.navigate(['/login']);
-//                 break;
-//               // case 500:
-//               // localStorage.setItem('temp_url', localStorage.getItem('url') || '/')
-//               // localStorage.removeItem('token');
-//               // this.router.navigate(['/login']);
-//               // break;
-//               default:
-//                 // this.router.navigate(['info/error']);
-//                 return;
-//             }
-//           }
-//           return err;
-//         },
-//       })
-//     );
-//   }
-// }
-
-
+import { catchError, delay, first, from, map, mergeMap, Observable, of, retry, retryWhen, switchMap, take, throwError } from 'rxjs';
+import { CommonService } from './common.service';
 
 export const MyHttpInterceptor: HttpInterceptorFn = (
   req: HttpRequest<any>,
   next: HttpHandlerFn
 ): Observable<HttpEvent<any>> => {
+  let commonService: CommonService = inject(CommonService);
   let access_token = localStorage.getItem('accessToken');
-  let cloned;
+  let cloned = req;
   if (access_token) {
     cloned = req.clone({
       setHeaders: {
-        authorization: access_token,
+        "Accept": "*/*",
+        "Access-Control-Expose-Headers": "*",
+        "Access-Control-Allow-Headers": "*",
+        authorization: `Bearer ${access_token}`,
       },
     });
-  } else {
-    cloned = req;
   }
   return next(cloned).pipe(
-    retry(2),
-    // finalize(() => this.service.loader.next(false)),
-    tap({
-      next: (httpEvent) => {
-        // console.log(httpEvent);
-        if (httpEvent instanceof HttpResponse) {
-          // console.log(httpEvent.headers.keys())
-          // console.log(httpEvent.headers.getAll('host-header'), 'host header');
-          // console.log(httpEvent.headers.has('token'), 'token');
-          // console.log(httpEvent.headers.keys(),'responses');
-        }
-      },
-      error: (err: any) => {
-        // console.log(err,'intercept');
-
-        if (err instanceof HttpErrorResponse) {
-          switch (err.status) {
-            case 401:
-
-              break;
-            case 402:
-
-              break;
-            case 403:
-
-              break;
-            // case 500:
-            // localStorage.setItem('temp_url', localStorage.getItem('url') || '/')
-            // localStorage.removeItem('token');
-            // this.router.navigate(['/login']);
-            // break;
-            default:
-              // this.router.navigate(['info/error']);
-              return;
-          }
-        }
-        return err;
-      },
+    // retryWhen(errors =>
+    //   errors.pipe(
+    //     mergeMap((error, index) => {
+    //       if (index < 2 && [401, 403].includes(error.status)) {
+    //         return commonService.updateToken().pipe(
+    //           delay(1000),
+    //           map(() => {
+    //             let access_token = localStorage.getItem('accessToken');
+    //             const clonedRequest = req.clone({
+    //               headers: req.headers.set('Authorization', `Bearer ${access_token}`)
+    //             });
+    //             return next(clonedRequest);
+    //           })
+    //         );
+    //       }
+    //       // return throwError(() => error);
+    //       // if (error instanceof HttpErrorResponse) {
+    //       //   // Retry up to 3 times with a delay of 1 second
+    //       //   if (index < 2) {
+    //       //     return of(error).pipe(delay(1000));
+    //       //   }
+    //       // }
+    //       return throwError(error);
+    //     }),
+    //     take(2) // Limit the number of retries
+    //   )
+    // ),
+    catchError((error: HttpErrorResponse) => {
+      if ([401, 403].includes(error.status)) {
+        return commonService.updateToken().pipe(
+          switchMap(() => {
+            let access_token = localStorage.getItem('accessToken');
+            const clonedRequest = req.clone({
+              headers: req.headers.set('Authorization', `Bearer ${access_token}`)
+            });
+            return next(clonedRequest);
+          })
+        );
+      }
+      return throwError(() => error);
     })
-  );
+  )
 }
